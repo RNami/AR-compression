@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.io import wavfile
 
 
 def YuleWalkerACoefs (x, window):
@@ -52,6 +53,27 @@ def PrintImageArray (array):
 def PrintArray (array):
     plt.plot (array)
     plt.show ()
+
+def WavAR (path: str, window: int = 2):
+
+    sample_rate, data = wavfile.read (path)
+
+    data_channels = []
+    
+    for dim in range (data.shape[1]):
+        data_channels.append (data [:, dim])
+    
+    print (len (data_channels))
+
+    wav_reconstructed_ch = []
+
+    for channel in range (len (data_channels)):
+        wav_reconstructed_ch.append (
+            np.int16(YuleWalkerACoefsInverse (data_channels [channel], YuleWalkerACoefs (data_channels [channel], window), window))
+            )
+
+    wav_reconstructed = np.vstack ((chan for chan in wav_reconstructed_ch)).T
+    wavfile.write ('wav_reconstructed.wav', sample_rate, np.int16(wav_reconstructed))
 
 
 
