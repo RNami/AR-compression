@@ -102,7 +102,7 @@ def reconstructPicfromACoefs (aCoefs, pic):
 def optimizeAcoefs (aCoefs, pic, reconstructed_pic, max_iterations=100) :
     
     # Optimizes ACoefs
-    
+
     def calculateDiff (aCoefs, pic, reconstructed_pic):
 
         diff = np.sum (np.abs (pic - reconstructPicfromACoefs (aCoefs, pic)))
@@ -125,6 +125,29 @@ def optimizeAcoefs (aCoefs, pic, reconstructed_pic, max_iterations=100) :
             break
     
     return aCoefs
+
+def optimizeAcoefs_2 (aCoefs, pic, reconstructed_pic, max_iterations=100, tolerance=1e-6):
+    from scipy.optimize import minimize
+
+    # Optimizes ACoefs
+
+    def calculateDiff(aCoefs):
+        return np.sum(np.abs(pic - reconstructPicfromACoefs(aCoefs, pic)))
+
+    # Define the objective function for minimization
+    def objective(aCoefs):
+        return calculateDiff(aCoefs)
+
+    # Initial guess for optimization
+    initial_guess = aCoefs
+
+    # Define bounds for coefficients, if needed
+    bounds = [(None, None)] * len(aCoefs)  # Assuming no bounds for coefficients
+
+    # Minimize the objective function using a suitable optimization algorithm
+    result = minimize(objective, initial_guess, bounds=bounds, options={'maxiter': max_iterations, 'tol': tolerance})
+
+    return result.x
 
 def mse(img1, img2): # MSE Score
     # MSE Score: 
@@ -161,13 +184,44 @@ def createHist (pic, pic_address, filename, pic_recons_frompic, pic_recons_fromp
 
     fig.savefig ('output/' + filename)
 
+def image_resize(image, width = None, height = None, inter = cv.INTER_AREA):
+    # initialize the dimensions of the image to be resized and
+    # grab the image size
+    dim = None
+    (h, w) = image.shape[:2]
+
+    # if both the width and height are None, then return the
+    # original image
+    if width is None and height is None:
+        return image
+
+    # check to see if the width is None
+    if width is None:
+        # calculate the ratio of the height and construct the
+        # dimensions
+        r = height / float(h)
+        dim = (int(w * r), height)
+
+    # otherwise, the height is None
+    else:
+        # calculate the ratio of the width and construct the
+        # dimensions
+        r = width / float(w)
+        dim = (width, int(h * r))
+
+    # resize the image
+    resized = cv.resize(image, dim, interpolation = inter)
+
+    # return the resized image
+    return resized
+
 def create_report (file_path, filename):
     pic_src = cv.imread (file_path)
     pic = cv.cvtColor(pic_src, cv.COLOR_BGR2GRAY) 
 
 
     aCoefs = calculateACoefs (pic)
-    aCoefs_optimized = optimizeAcoefs (aCoefs, pic, reconstructPicfromACoefs (aCoefs, pic))
+    aCoefs_optimized = optimizeAcoefs_2 (aCoefs, pic, reconstructPicfromACoefs (aCoefs, pic))
 
     pic_recons_frompic = reconstructPicfromACoefs (aCoefs, pic)
     pic_recons_frompic_optimized = reconstructPicfromACoefs (aCoefs_optimized, pic)
