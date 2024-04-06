@@ -1,94 +1,196 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
-from scipy.io import wavfile
+import cv2 as cv
 
 
-def YuleWalkerACoefs (x, window):
-    r = []
-    r.append (np.mean (x[0:] * x[0:]))
-    for i in range (1, window+1):
-        r.append (np.mean (x[0:-i] * x[i:]))
+def divideArrayIntoBatches (array, num_divisions) -> list:
+    """
+    Divides a 2D array into 16 batches.
+    
+    Args:
+        array: a 2D numpy array.
+        num_divisions: The number of divisions to use.
 
-    R = np.transpose (r[1:])
+    Returns:
+    A list of 16 2D numpy arrays, each of which is a batch of the input array.
+    """
 
-    FI = ConstructMatrixFi (window, r)
+    if len (array.shape) != 2:
+        raise ValueError ("Input array must be 2D")
 
-    aCoefs = np.linalg.inv(FI) * R
+    num_rows, num_cols = array.shape
+
+    if num_rows == 0 or num_cols == 0:
+        return []
+    
+    batch_size_rows = (num_rows) // num_divisions
+    batch_size_cols = (num_cols) // num_divisions
+
+    batches = []
+    for i in range (num_divisions):
+        for j in range (num_divisions):
+            batch = array [i * batch_size_rows: (i + 1) * batch_size_rows,
+                           j * batch_size_cols: (j + 1) * batch_size_cols]
+            batches.append (batch)
+
+    return batches
+
+def exportToExcel (array, str = 'diff.xlsx'):
+    import pandas as pd
+
+    temp = pd.DataFrame (array)
+    temp.to_excel (str);
+
+def calculateACoefs (pic):
+    """
+        Calculates the aCoefs using the given 2D numpy array (pic)
+
+        Args:
+            pic: a 2D numpy array representing the picture.
+
+        Returns:
+            aCoefs: a 1D numpy arrau containing the calculated aCoefs.
+    """
+    import numpy as np
+    from numpy import mean
+
+    R22 = R33 = R44 = R55 = mean (mean (pic * pic))
+    R12 = R34 = R45 = mean ( mean (pic[: , 1:-1] * pic[: , 2:]))
+    R13 = mean (mean (pic[1:-1, 1:-1] * pic[2:, 2:]))
+    R14 = R23 = mean (mean (pic[1:-1 , :] * pic[2:, :]))
+    R15 = R24 = mean (mean (pic[2:, 1:-1] * pic[1:-1, 2:]))
+    R25 = mean (mean (pic[1:-1, 3:] * pic[2:, 1:-2]))
+    R35 = mean (mean (pic[:, 3:] * pic[:, 1:-2]))
+
+    Phi = np.array ([[R22, R23, R24, R25],
+                    [R23, R22, R34, R35],
+                    [R24, R34, R22, R45],
+                    [R25, R35, R45, R22]])
+
+    R = np.array ([R12, R13, R14, R15])
+
+    aCoefs = np.linalg.solve (Phi, R)
 
     return aCoefs
 
-def YuleWalkerACoefsInverse (x, aCoefs, window):
-    xhad = [0 for i in range (1, len(x)+1)]
+# Reconstruction:
+def reconstructPicfromACoefs (aCoefs, pic):
+    """
+    Reconstructs the image using the given 2D numpy array (pic) and aCoefs.
 
-    for m in range (window, len(x)):
-        a_temp = np.array ([])
-        a_2 = 0
-        for j in range (window):
-            a_temp = (aCoefs[j] * x[m - j - 1])
-            a_2 += a_temp
-        xhad[m] = np.sum (a_2)
+    Args:
+        aCoefs: a 1D numpy array containing aCoefs.
+        pic: a 2D numpy array representing the picture. 
 
-    return xhad
+    Returns:
+        pic_recons_frompic: a 2D numpy array representing the recontructed image using the original image.
 
-def ConstructMatrixFi (n, r):
-    FI = np.zeros ((n, n))
-    for i in range (n):
-        for j in range (n):
-            distance = abs (i - j)
-            FI[i, j] = r[distance]
-    return FI
+    """
 
-def ClosestSquare (array):
-    a = np.floor (np.sqrt (array.shape[0]))
-    while array.shape[0] % a:
-        a -= 1
-    return (int(a), int(array.shape[0]/a))
+    pic_recons_fromzero = np.zeros (pic.shape, dtype='double')
+    pic_recons_fromzero[:,0] = pic[:,0]
+    pic_recons_fromzero[0,:] = pic[0,:]
 
-def PrintImageArray (array):
-    print ("shape: ", array.reshape (ClosestSquare (array)).shape)
-    plt.imshow (array.reshape (ClosestSquare (array)))
-    plt.colorbar ()
-    plt.show ()
+    for i in range (1 , pic.shape[0]-1):
+        for j in range (1, pic.shape[1]-1):
+            pic_recons_fromzero [i, j] = aCoefs[0]*pic_recons_fromzero[i-1,j] + aCoefs[1]*pic_recons_fromzero[i-1,j+1] + aCoefs[2]*pic_recons_fromzero[i,j+1] + aCoefs[3]*pic_recons_fromzero[i+1,j+1]
 
-def PrintArray (array):
-    plt.plot (array)
-    plt.show ()
+    pic_recons_frompic = np.zeros (pic.shape, dtype='double')
 
-def WavAR (path: str, window: int = 2):
+    pic_recons_frompic[1:-1, 1:-1] = aCoefs[0] * pic[:-2, 1:-1] + aCoefs[1] * pic[:-2, 2:] + aCoefs[2] * pic[1:-1, 2:] + aCoefs[3] * pic[2:, 2:]
 
-    sample_rate, data = wavfile.read (path)
+    return pic_recons_frompic
 
-    data_channels = []
+def optimizeAcoefs (aCoefs, pic, reconstructed_pic, max_iterations=100) :
     
-    for dim in range (data.shape[1]):
-        data_channels.append (data [:, dim])
+    # Optimizes ACoefs
+
+    import numpy as np
+
+    def calculateDiff (aCoefs, pic, reconstructed_pic):
+
+        diff = np.sum (np.abs (pic - reconstructPicfromACoefs (aCoefs, pic)))
+        return diff
     
-    print (len (data_channels))
+    # aCoefs = np.random.rand (4)
+    step_size = 0.01
+    tolerance = 1e-6
 
-    wav_reconstructed_ch = []
+    diff = calculateDiff (aCoefs, pic, reconstructed_pic)
 
-    for channel in range (len (data_channels)):
-        wav_reconstructed_ch.append (
-            np.int16(YuleWalkerACoefsInverse (data_channels [channel], YuleWalkerACoefs (data_channels [channel], window), window))
-            )
+    for i in range (max_iterations):
+        new_aCoefs = aCoefs + np.random.normal (0, step_size, size=4)
+        new_diff = calculateDiff (new_aCoefs, pic, reconstructed_pic)
 
-    wav_reconstructed = np.vstack ((chan for chan in wav_reconstructed_ch)).T
-    wavfile.write ('wav_reconstructed.wav', sample_rate, np.int16(wav_reconstructed))
+        if new_diff < diff:
+            aCoefs = new_aCoefs
+            diff = new_diff
+
+        if diff < tolerance:
+            break
+    
+    return aCoefs
+
+def mse(img1, img2): # MSE Score
+    # MSE Score: 
+    h, w = img1.shape
+    diff = abs (img1 - img2)
+    err = np.sum(diff**2)
+    mse = err/(float(h*w))
+    return mse
+
+def createDiffMatrix (pic, pic_recons):
+    return pic - pic_recons
+
+def createHist (pic, pic_address, filename):
+    fig = plt.figure (figsize= (10, 8))
+    plt.subplot (2,2,1)
+    plt.hist (createDiffMatrix(pic, pic_recons_frompic).ravel(), 256, [-127, 127])
+    plt.title ('diff')
+    plt.grid ()
+    plt.subplot (2,2,2)
+    plt.hist (createDiffMatrix(pic, pic_recons_frompic).ravel(), 256, [-127, 127], log=True)
+    plt.title ('Log diff')
+    plt.grid ()
+
+    plt.subplot (2,2,3)
+    plt.hist (createDiffMatrix(pic, pic_recons_frompic_optimized).ravel(), 256, [-127, 127])
+    plt.title ('diff (optimized)')
+    plt.grid ()
+    plt.subplot (2,2,4)
+    plt.hist (createDiffMatrix(pic, pic_recons_frompic_optimized).ravel(), 256, [-127, 127], log=True)
+    plt.title ('Log diff (optimized)')
+    plt.grid ()
+
+    plt.figtext (0, 0, 'pic: {}'.format (pic_address))
+
+    fig.savefig ('output/' + filename)
+
+    
+
+directory_str = 'test_pics\\Miniatures'
+
+for filename in os.listdir (directory_str):
+    file_path = os.path.join (directory_str, filename)
+
+    print (filename)
+
+    if os.path.exists ('output/' + filename):
+        print ('Output file already exists. Skipped.')
+        continue
+
+    pic_src = cv.imread (file_path)
+    pic = cv.cvtColor(pic_src, cv.COLOR_BGR2GRAY) 
 
 
+    aCoefs = calculateACoefs (pic)
+    aCoefs_optimized = optimizeAcoefs (aCoefs, pic, reconstructPicfromACoefs (aCoefs, pic))
 
-# n = np.arange (0, 100)
-n = np.linspace (0, 4*np.pi, 200)
+    pic_recons_frompic = reconstructPicfromACoefs (aCoefs, pic)
+    pic_recons_frompic_optimized = reconstructPicfromACoefs (aCoefs_optimized, pic)
 
-# x = (.5)**n + (.25)**n
-# x = n**2
-x = np.sin (n * 4)
+    createHist (pic, file_path, filename)
 
 
-window = 4
-
-xhad = YuleWalkerACoefsInverse (x, YuleWalkerACoefs (x, window), window)
-
-plt.plot (x[window:])
-plt.plot (xhad[window:])
-plt.show ()
+print ('Task ended successfully.')
