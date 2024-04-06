@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
+from scipy.optimize import minimize
+import DataframeCreator as dfc
 
 def divideArrayIntoBatches (array, num_divisions) -> list:
     """
@@ -126,8 +128,7 @@ def optimizeAcoefs (aCoefs, pic, reconstructed_pic, max_iterations=100) :
     
     return aCoefs
 
-def optimizeAcoefs_2 (aCoefs, pic, reconstructed_pic, max_iterations=100, tolerance=1e-6):
-    from scipy.optimize import minimize
+def optimizeAcoefs_2 (aCoefs, pic, reconstructed_pic, max_iterations=100, tolerance=1e-5):
 
     # Optimizes ACoefs
 
@@ -215,15 +216,19 @@ def image_resize(image, width = None, height = None, inter = cv.INTER_AREA):
     # return the resized image
     return resized
 
-def create_report (file_path, filename):
+def create_report (file_path, filename, dataframe):
     pic_src = cv.imread (file_path)
     pic = cv.cvtColor(pic_src, cv.COLOR_BGR2GRAY) 
 
+    pic = image_resize (pic, height= 512)
 
     aCoefs = calculateACoefs (pic)
-    aCoefs_optimized = optimizeAcoefs_2 (aCoefs, pic, reconstructPicfromACoefs (aCoefs, pic))
+    aCoefs_optimized = optimizeAcoefs (aCoefs, pic, reconstructPicfromACoefs (aCoefs, pic))
 
     pic_recons_frompic = reconstructPicfromACoefs (aCoefs, pic)
     pic_recons_frompic_optimized = reconstructPicfromACoefs (aCoefs_optimized, pic)
 
     createHist (pic, file_path, filename, pic_recons_frompic, pic_recons_frompic_optimized)
+    dfc.appendRow (dataframe, filename, aCoefs, aCoefs_optimized)
+    
+
