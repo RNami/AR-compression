@@ -1,8 +1,6 @@
 import numpy as np
-import os
 import matplotlib.pyplot as plt
 import cv2 as cv
-
 
 def divideArrayIntoBatches (array, num_divisions) -> list:
     """
@@ -74,7 +72,6 @@ def calculateACoefs (pic):
 
     return aCoefs
 
-# Reconstruction:
 def reconstructPicfromACoefs (aCoefs, pic):
     """
     Reconstructs the image using the given 2D numpy array (pic) and aCoefs.
@@ -105,15 +102,12 @@ def reconstructPicfromACoefs (aCoefs, pic):
 def optimizeAcoefs (aCoefs, pic, reconstructed_pic, max_iterations=100) :
     
     # Optimizes ACoefs
-
-    import numpy as np
-
+    
     def calculateDiff (aCoefs, pic, reconstructed_pic):
 
         diff = np.sum (np.abs (pic - reconstructPicfromACoefs (aCoefs, pic)))
         return diff
     
-    # aCoefs = np.random.rand (4)
     step_size = 0.01
     tolerance = 1e-6
 
@@ -143,7 +137,7 @@ def mse(img1, img2): # MSE Score
 def createDiffMatrix (pic, pic_recons):
     return pic - pic_recons
 
-def createHist (pic, pic_address, filename):
+def createHist (pic, pic_address, filename, pic_recons_frompic, pic_recons_frompic_optimized):
     fig = plt.figure (figsize= (10, 8))
     plt.subplot (2,2,1)
     plt.hist (createDiffMatrix(pic, pic_recons_frompic).ravel(), 256, [-127, 127])
@@ -167,19 +161,7 @@ def createHist (pic, pic_address, filename):
 
     fig.savefig ('output/' + filename)
 
-    
-
-directory_str = 'test_pics\\Miniatures'
-
-for filename in os.listdir (directory_str):
-    file_path = os.path.join (directory_str, filename)
-
-    print (filename)
-
-    if os.path.exists ('output/' + filename):
-        print ('Output file already exists. Skipped.')
-        continue
-
+def create_report (file_path, filename):
     pic_src = cv.imread (file_path)
     pic = cv.cvtColor(pic_src, cv.COLOR_BGR2GRAY) 
 
@@ -190,7 +172,4 @@ for filename in os.listdir (directory_str):
     pic_recons_frompic = reconstructPicfromACoefs (aCoefs, pic)
     pic_recons_frompic_optimized = reconstructPicfromACoefs (aCoefs_optimized, pic)
 
-    createHist (pic, file_path, filename)
-
-
-print ('Task ended successfully.')
+    createHist (pic, file_path, filename, pic_recons_frompic, pic_recons_frompic_optimized)
