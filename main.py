@@ -1,5 +1,4 @@
 import reconstruction as re
-import pandas as pd
 import DataframeCreator as dfc
 
 
@@ -7,12 +6,10 @@ def main ():
 
     test_files_directory = 'test_pics/Downloaded Persian Miniatures - Cropped and Resized/'
     output_files_directory = 'output/'
-    excel_directory = 'Acoefs.xlsx'
+    excel_directory = 'data.xlsx'
 
 
-    df = pd.read_excel (excel_directory)
-    df = re.addGaussianParsToDataFrame (re.convertExcel2Dataframe (excel_directory), test_files_directory)
-    dfc.exportDataFrameToExcel (df, 'data.xlsx')
+    df = re.convertExcel2Dataframe (excel_file_path=excel_directory)
 
     print ('Task ended successfully.')
 

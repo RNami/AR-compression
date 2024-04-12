@@ -249,18 +249,18 @@ def appendColumnToDataframe (df:pd.DataFrame, column_name:str, added_data:any = 
     df[column_name] = added_data
 
 def addGaussianParsToDataFrame (df:pd.DataFrame, files_dir:str):
-    if 'mean' not in df.columns:
-        appendColumnToDataframe (df, 'mean')
-    if 'std' not in df.columns:
-        appendColumnToDataframe (df, 'std')
+    if 'mean_value' not in df.columns:
+        appendColumnToDataframe (df, 'mean_value')
+    if 'std_value' not in df.columns:
+        appendColumnToDataframe (df, 'std_value')
 
     i = 0
     for row in df.itertuples ():
         if i > df.shape [0] + 1:
             break
         pars = gaussianPars (createDiffFromPath (files_dir, row.file_name, acoef_str2array (row.aCoefs_optimized)))
-        df.loc [row.Index, 'mean'] =  pars [0]
-        df.loc [row.Index, 'std'] =  pars [1]
+        df.loc [row.Index, 'mean_value'] =  pars [0]
+        df.loc [row.Index, 'std_value'] =  pars [1]
         i += 1
 
     return df
