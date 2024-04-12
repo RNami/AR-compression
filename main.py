@@ -1,38 +1,18 @@
 import reconstruction as re
-import os
 import pandas as pd
 import DataframeCreator as dfc
 
-def fetchFilenames (file_directory):
-    return os.listdir (file_directory)
 
 def main ():
 
-    test_files_directory = 'test_pics/Downloaded Persian Miniatures - Cropped and Resized'
+    test_files_directory = 'test_pics/Downloaded Persian Miniatures - Cropped and Resized/'
     output_files_directory = 'output/'
+    excel_directory = 'Acoefs.xlsx'
 
 
-    if os.path.isfile ('Acoefs.xlsx'):
-        df = pd.read_excel ('Acoefs.xlsx')
-    else:
-        df = pd.DataFrame ({'file name':[], 'acoefs':[], 'aCoefs_optimized':[]})
-        dfc.appendRow (df, 'blank', None, None)
-        dfc.exportDataFrameToExcel (df)
-        
-
-    for filename in os.listdir (test_files_directory):
-        file_path = os.path.join (test_files_directory, filename)
-
-        print (filename)
-
-        if os.path.exists (output_files_directory + filename):
-            print ('Output file already exists. Skipped.')
-            continue
-
-        re.create_report (file_path, filename, df)
-        dfc.exportDataFrameToExcel (df)
-        
-
+    df = pd.read_excel (excel_directory)
+    df = re.addGaussianParsToDataFrame (re.convertExcel2Dataframe (excel_directory), test_files_directory)
+    dfc.exportDataFrameToExcel (df, 'data.xlsx')
 
     print ('Task ended successfully.')
 
