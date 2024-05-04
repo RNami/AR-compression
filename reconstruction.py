@@ -76,7 +76,7 @@ def calculateACoefs (pic):
             pic: a 2D numpy array representing the picture.
 
         Returns:
-            aCoefs: a 1D numpy arrau containing the calculated aCoefs.
+            aCoefs: a 1D numpy array containing the calculated aCoefs.
     '''
     import numpy as np
     from numpy import mean
